@@ -99,7 +99,7 @@
                                             <ColumnDefinition Width="0.5*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="图片目录：" Margin="0,0,5,0" VerticalAlignment="Center" TextAlignment="Center"/>
-                                        <TextBox Grid.Column="1" Text="" Margin="0,0,5,0" Name="PathTextBox" IsEnabled="{Binding CanInput,UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBox Grid.Column="1" Text="" Margin="0,0,5,0" Name="PathTextBox" IsEnabled="{Binding CanInput,UpdateSourceTrigger=PropertyChanged}" TextAlignment="Center" VerticalContentAlignment="Center"/>
                                         <Button Grid.Column="2" Content="..." HorizontalAlignment="Stretch" Name="PathButton" IsEnabled="{Binding CanInput,UpdateSourceTrigger=PropertyChanged}" Click="PathButton_Click" VerticalContentAlignment ="Center"/>
                                     </Grid>
                                     <Grid Grid.Row="2"  Margin="0,2,5,0">
