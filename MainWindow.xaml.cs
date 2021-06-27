@@ -20,7 +20,11 @@ namespace ESP8266_Controller_WPF
             InitializeComponent();
         }
 
+<<<<<<< HEAD
         private PlayImage pi = new();
+=======
+        private PlayImage pi = new PlayImage();
+>>>>>>> 添加项目文件。
         private SerialPort sp;
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -41,7 +45,11 @@ namespace ESP8266_Controller_WPF
 
         private void LimitInputNumber(object sender, TextCompositionEventArgs e)
         {
+<<<<<<< HEAD
             Regex re = new("[^0-9]+");
+=======
+            Regex re = new Regex("[^0-9]+");
+>>>>>>> 添加项目文件。
             e.Handled = re.IsMatch(e.Text);
         }
 

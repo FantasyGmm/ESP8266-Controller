@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 ﻿<Application x:Class="ESP8266_Controller_WPF.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:ESP8266_Controller_WPF"
+=======
+﻿<Application x:Class="ESP8266_Controller.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:ESP8266_Controller"
+>>>>>>> 添加项目文件。
              StartupUri="MainWindow.xaml">
     <Application.Resources>
          
