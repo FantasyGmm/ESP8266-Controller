@@ -41,6 +41,7 @@ namespace ESP8266_Controller_WPF
             FpsComboBox.DataContext = pi;
             ColorModeComboBox.DataContext = pi;
             AIDAQuery();
+
         }
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
@@ -66,7 +67,7 @@ namespace ESP8266_Controller_WPF
             {
                 if (string.IsNullOrEmpty(PathTextBox.Text))
                 {
-                    LogBox.AppendText("请选择图片路径" + Environment.NewLine);
+                    LogOut("请选择图片路径");
                     return;
                 }
                 PlayButton.Content = "暂停";
@@ -97,7 +98,7 @@ namespace ESP8266_Controller_WPF
         {
             if (SerialPort.GetPortNames().Length == 0)
             {
-                LogBox.AppendText("未检测到串口，请插入设备" + Environment.NewLine);
+                LogOut("未检测到串口，请插入设备");
             }
             for (var i = 1; i < SerialPortComboBox.Items.Count; i++)
             {
@@ -115,7 +116,7 @@ namespace ESP8266_Controller_WPF
         {
             if ((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString().Equals("选择串口"))
             {
-                LogBox.AppendText("请选择串口，再尝试链接"+Environment.NewLine);
+                LogOut("请选择串口，再尝试链接");
                 return;
             }
             if (ConnectButton.Content.ToString().Equals("断开"))
@@ -143,12 +144,18 @@ namespace ESP8266_Controller_WPF
                 BaudRateComboBox.IsEnabled = false;
                 SerialPortComboBox.IsEnabled = false;
                 ConnectButton.Content = "断开";
-                LogBox.AppendText("串口连接成功" + Environment.NewLine);
+                LogOut("串口连接成功");
             }
             else
             {
-                LogBox.AppendText("串口连接失败" + Environment.NewLine);
+                LogOut("串口连接失败");
             }
+        }
+
+        public void LogOut(string log)
+        {
+            LogBox.AppendText(log+Environment.NewLine);
+            LogBox.ScrollToEnd();
         }
         private bool AIDAQuery()
         {
@@ -159,7 +166,7 @@ namespace ESP8266_Controller_WPF
             }
             catch
             {
-                LogBox.AppendText("请启动AIDA64否则无法获取到硬件数据！"+Environment.NewLine);
+                LogOut("请启动AIDA64否则无法获取到硬件数据！");
                 return false;
             }
         }

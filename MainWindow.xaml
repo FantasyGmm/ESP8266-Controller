@@ -5,13 +5,17 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ESP8266_Controller_WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="600" Width="800" Loaded="Window_Loaded">
+        Title="MainWindow" Height="600" Width="800" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen">
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="319*"/>
+            <ColumnDefinition Width="474*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Grid Margin="0,5,0,0">
+        <Grid Margin="0,5,-0.4,20.4" Grid.ColumnSpan="2" Grid.RowSpan="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Name="ControlPanel" Width="3*"/>
                 <ColumnDefinition Name="SettingPanel" Width="*"/>
@@ -168,7 +172,7 @@
             </TabControl>
         </Grid>
         <!--底部信息显示-->
-        <StatusBar Grid.Row="1 ">
+        <StatusBar Grid.Row="1 " Grid.ColumnSpan="2" Margin="0,0.4,-0.4,0.4">
             <StatusBarItem>
                 <TextBlock Text="状态：" TextAlignment="Center" VerticalAlignment="Center"/>
             </StatusBarItem>
