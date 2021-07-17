@@ -1,17 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System.Windows;
-using System.Windows.Input;
+﻿using ESP8266_Controller;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Ports;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using System.Xml.Linq;
 
-namespace ESP8266_Controller_WPF
+namespace ESP8266_Controller
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -24,11 +30,14 @@ namespace ESP8266_Controller_WPF
         }
         private PlayImage pi = new PlayImage();
         private SerialPort sp;
-        MemoryMappedViewAccessor Accessor;
-        public List<string> id = new List<string>();
-        public List<string> value = new List<string>();
-        public List<string> hddId = new List<string>();
-        public List<string> hddValue = new List<string>();
+        private MemoryMappedViewAccessor Accessor;
+        private IEnumerable<XElement> aidaElements;
+        private Task serialReadTask;
+        private Task serialSendTask;
+        private CancellationTokenSource sendTaskTokenSource;
+        private CancellationToken sendTaskToken;
+        private DispatcherTimer sendIndexTimer;
+        private int sendIndex = 0;
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             BackButton.DataContext = pi;
@@ -40,8 +49,31 @@ namespace ESP8266_Controller_WPF
             HeightComboBox.DataContext = pi;
             FpsComboBox.DataContext = pi;
             ColorModeComboBox.DataContext = pi;
-            AIDAQuery();
-
+            if (AIDAQuery())
+            {
+                GetAidaInfo();
+                AddCheckBox();
+                SendInfoButton.IsEnabled = true;
+            }
+            LoadJsonConfig();
+            addSerialComboItem();
+            if (SerialPort.GetPortNames().Length == 1)
+            {
+                LogOut("未检测到串口，请插入设备");
+            }
+            else
+            {
+                sp = new SerialPort((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString(), Convert.ToInt32((BaudRateComboBox.SelectedItem as ComboBoxItem).Content.ToString()))
+                {
+                    DataBits = 8,
+                    Parity = Parity.None,
+                    StopBits = StopBits.One,
+                    Handshake = Handshake.None,
+                    ReceivedBytesThreshold = 13,
+                    RtsEnable = false,
+                    DtrEnable = false
+                };
+            }
         }
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
@@ -96,25 +128,36 @@ namespace ESP8266_Controller_WPF
 
         private void FlushButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SerialPort.GetPortNames().Length == 0)
+            LogBox.Text = "";
+            if (SerialPort.GetPortNames().Length == 1)
             {
                 LogOut("未检测到串口，请插入设备");
             }
-            for (var i = 1; i < SerialPortComboBox.Items.Count; i++)
+            else
             {
-                SerialPortComboBox.Items.Remove(SerialPortComboBox.Items[i]);
+                sp = new SerialPort((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString(), Convert.ToInt32((BaudRateComboBox.SelectedItem as ComboBoxItem).Content.ToString()))
+                {
+                    DataBits = 8,
+                    Parity = Parity.None,
+                    StopBits = StopBits.One,
+                    Handshake = Handshake.None,
+                    ReceivedBytesThreshold = 13,
+                    RtsEnable = false,
+                    DtrEnable = false
+                };
             }
-            foreach (var portName in SerialPort.GetPortNames())
+            addSerialComboItem();
+            if (AIDAQuery())
             {
-                ComboBoxItem cbi = new ComboBoxItem {Content = portName};
-                SerialPortComboBox.Items.Add(cbi);
+                GetAidaInfo();
+                AddCheckBox();
+                SendInfoButton.IsEnabled = true;
             }
-            SerialPortComboBox.SelectedIndex = 1;
         }
 
         private void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
-            if ((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString().Equals("选择串口"))
+            if (((ComboBoxItem) SerialPortComboBox.SelectedItem).Content.ToString().Equals("选择串口"))
             {
                 LogOut("请选择串口，再尝试链接");
                 return;
@@ -128,14 +171,6 @@ namespace ESP8266_Controller_WPF
                 SerialPortComboBox.IsEnabled = true;
                 return;
             }
-            sp = new SerialPort((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString(), Convert.ToInt32((BaudRateComboBox.SelectedItem as ComboBoxItem).Content.ToString()));
-            sp.DataBits = 8;
-            sp.Parity = Parity.None;
-            sp.StopBits = StopBits.One;
-            sp.Handshake = Handshake.None;
-            sp.ReceivedBytesThreshold = 13;
-            sp.RtsEnable = false;
-            sp.DtrEnable = false;
             sp.Open();
             if (sp.IsOpen)
             {
@@ -143,19 +178,29 @@ namespace ESP8266_Controller_WPF
                 FlushButton.IsEnabled = false;
                 BaudRateComboBox.IsEnabled = false;
                 SerialPortComboBox.IsEnabled = false;
+                SendInfoButton.IsEnabled = true;
                 ConnectButton.Content = "断开";
                 LogOut("串口连接成功");
+                serialReadTask = new Task(() =>
+                {
+                    SerialCommand(sp.ReadLine());
+                });
+                serialReadTask.Start();
             }
             else
             {
                 LogOut("串口连接失败");
             }
         }
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            SaveJsonConfig();
+        }
 
         public void LogOut(string log)
         {
             LogBox.AppendText(log+Environment.NewLine);
-            LogBox.ScrollToEnd();
+            //LogBox.ScrollToEnd();
         }
         private bool AIDAQuery()
         {
@@ -166,125 +211,322 @@ namespace ESP8266_Controller_WPF
             }
             catch
             {
-                LogOut("请启动AIDA64否则无法获取到硬件数据！");
+                LogOut("请启动AIDA64并开启内存共享否则无法获取到硬件数据！");
                 return false;
             }
         }
-        public void GetAidaInfo()
+        private void GetAidaInfo()
         {
             StringBuilder tmp = new StringBuilder();
+            MemoryStream ms = new MemoryStream();
+            for (int i = 0; i < Accessor.Capacity; i++)
+            {
+                byte c = Accessor.ReadByte(i);
+                if (c == '\0')
+                    break;
+                ms.WriteByte(c);
+            }
+            tmp.Append("<AIDA>");
+            tmp.Append(Encoding.Default.GetString(ms.ToArray()));
+            tmp.Append("</AIDA>");
             try
             {
-                MemoryStream ms = new MemoryStream();
-                for (int i = 0; i < Accessor.Capacity; i++)
-                {
-                    byte c = Accessor.ReadByte(i);
-                    if (c == '\0')
-                        break;
-                    ms.WriteByte(c);
-                }
-                tmp.Append("<AIDA>");
-                tmp.Append(Encoding.Default.GetString(ms.ToArray()));
-                tmp.Append("</AIDA>");
                 XDocument xmldoc = XDocument.Parse(tmp.ToString());
-                IEnumerable<XElement> sysEnumerator = xmldoc.Element("AIDA").Elements("sys");
-                InsertInfo(sysEnumerator);
-                IEnumerable<XElement> tempEnumerator = xmldoc.Element("AIDA").Elements("temp");
-                InsertInfo(tempEnumerator);
-                IEnumerable<XElement> fanEnumerator = xmldoc.Element("AIDA").Elements("fan");
-                InsertInfo(fanEnumerator);
-                IEnumerable<XElement> voltEnumerator = xmldoc.Element("AIDA").Elements("volt");
-                InsertInfo(voltEnumerator);
-                IEnumerable<XElement> pwrEnumerator = xmldoc.Element("AIDA").Elements("pwr");
-                InsertInfo(pwrEnumerator);
+                aidaElements = xmldoc.Element("AIDA").Elements();
             }
-            catch (Exception)
+            catch
+            {
+
+            }
+        }
+
+        public List<HardInfoItem> QuerySelectedInfo()
+        {
+            List<HardInfoItem> hardInfoList = new List<HardInfoItem>();
+            foreach (var child in HardInfoPanel.Children)
+            {
+                HardInfoItem hii = new HardInfoItem();
+                foreach (var a in ((StackPanel)child).Children.OfType<CheckBox>())
+                {
+                    if ((bool)a.IsChecked)
+                    {
+                        hii.contStr = (string)a.Content;
+                        foreach (var b in ((StackPanel)a.Parent).Children.OfType<TextBox>())
+                        {
+                            if (b.Name.Equals(a.Content + "textBox"))
+                            {
+                                hii.labelStr = b.Text;
+                                break;
+                            }
+                            if (b.Name.Equals(a.Content + "ProportionTextBox"))
+                            {
+                                hii.proportionStr = b.Text;
+                                break;
+                            }
+                        }
+                        foreach (var c in ((StackPanel)a.Parent).Children.OfType<ComboBox>())
+                        {
+                            if (c.Name.Equals(a.Content + "comboBox"))
+                            {
+                                hii.unitStr = c.SelectedItem.ToString();
+                                break;
+                            }
+                        }
+                        hardInfoList.Add(hii);
+                    }
+                }
+            }
+            return hardInfoList;
+        }
+        private void AddCheckBox()
+        {
+            foreach (var xElement in aidaElements)
+            {
+                CheckBox cb = new CheckBox
+                {
+                    Content = xElement.Element("id")?.Value,
+                    Width = HardInfoPanel.ActualWidth / 2.5
+                };
+                TextBox tb = new TextBox
+                {
+                    Text = xElement.Element("label")?.Value,
+                    Width = HardInfoPanel.ActualWidth / 4,
+                    Margin = new Thickness(5,0,5,0),
+                    Name = xElement.Element("id")?.Value + "textBox",
+                };
+                TextBox proportionTextBox = new TextBox()
+                {
+                    Text = "1",
+                    Name = xElement.Element("id")?.Value + "ProportionTextBox",
+                    Width = HardInfoPanel.ActualWidth / 16,
+                    Margin = new Thickness(5, 0, 5, 0),
+                    TextAlignment = TextAlignment.Center,
+                };
+                ComboBox cob = new ComboBox
+                {
+                    IsEditable = true,
+                    SelectedIndex = 0,
+                    Width = HardInfoPanel.ActualWidth / 8
+                };
+                cob.Items.Add("%");
+                cob.Items.Add("°C");
+                cob.Items.Add("Ghz");
+                cob.Items.Add("Mhz");
+                cob.Items.Add("GB");
+                cob.Items.Add("MB/s");
+                cob.Items.Add("KB/s");
+                cob.Name = xElement.Element("id")?.Value + "comboBox";
+                StackPanel sp = new StackPanel
+                {
+                    Margin = new Thickness(5, 5, 0, 0),
+                    Orientation = Orientation.Horizontal
+                };
+                sp.Children.Add(cb);
+                sp.Children.Add(tb);
+                sp.Children.Add(proportionTextBox);
+                sp.Children.Add(cob);
+                HardInfoPanel.Children.Add(sp);
+            }
+        }
+        private void addSerialComboItem()
+        {
+            string[] ports;
+            for (var i = 1; i < SerialPortComboBox.Items.Count; i++)
+            {
+                SerialPortComboBox.Items.Remove(SerialPortComboBox.Items[i]);
+            }
+            try
+            {
+                ports = SerialPort.GetPortNames();
+            }
+            catch
             {
                 return;
             }
-        }
-        public void InsertInfo(IEnumerable<XElement> xel)
-        {
-            foreach (var element in xel)
+            foreach (var portName in ports)
             {
-                for (int i = 1; i < 11; i++)
+                ComboBoxItem cbi = new ComboBoxItem { Content = portName };
+                SerialPortComboBox.Items.Add(cbi);
+            }
+            SerialPortComboBox.SelectedIndex = 1;
+        }
+        private void LoadJsonConfig()
+        {
+            if (!File.Exists("config.json"))
+                return;
+            JObject jobj = JObject.Parse(File.ReadAllText("config.json"));
+            foreach (var jtoken in jobj)
+            {
+                foreach (var child in HardInfoPanel.Children)
                 {
-                    if (element.Element("id").Value == "THDD" + i)
+                    JToken infoJToken = jobj[jtoken.Key];
+                    foreach (var a in ((StackPanel) child).Children.OfType<CheckBox>())
                     {
-                        hddId.Add(element.Element("id").Value);
-                        hddValue.Add(element.Element("value").Value);
+                        if (a.Content.ToString().Equals(jtoken.Key))
+                        {
+                            a.IsChecked = (bool)infoJToken["checked"];
+                            break;
+                        }
+                    }
+                    foreach (var b in ((StackPanel)child).Children.OfType<TextBox>())
+                    {
+                        if (b.Name.Equals(jtoken.Key + "ProportionTextBox"))
+                        {
+                            b.Text = infoJToken["proportion"].ToString();
+                            break;
+                        }
+                    }
+                    foreach (var c in ((StackPanel)child).Children.OfType<ComboBox>())
+                    {
+                        if (c.Name.Equals(jtoken.Key + "comboBox"))
+                        {
+                            if (c.Items.IndexOf(infoJToken["unit"]) !=-1)
+                            {
+                                c.SelectedIndex = c.Items.IndexOf(infoJToken["unit"].ToString());
+                            }
+                            else
+                            {
+                                c.Text = infoJToken["unit"].ToString();
+                            }
+                            break;
+                        }
                     }
                 }
-                switch (element.Element("id").Value)
+            }
+        }
+        //将硬件信息的选择保存进配置文件
+        private void SaveJsonConfig()
+        {
+            JObject jobj = new JObject();
+
+            foreach (var child in HardInfoPanel.Children)
+            {
+                HardInfoItem hii = new HardInfoItem();
+                foreach (var a in ((StackPanel)child).Children.OfType<CheckBox>())
                 {
-                    case "SCPUCLK": //CPU频率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "SCPUUTI": //CPU使用率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "SMEMUTI": //内存使用率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "SGPU1CLK": //GPU频率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "SGPU1UTI": //GPU使用率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "SVMEMUSAGE": //显存使用率
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "TMOBO": //主板温度
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "TCPU": //CPU温度
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "TGPU1DIO": //GPU温度
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "FCPU": //CPU风扇转速
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "FGPU1": //GPU风扇转速
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "VCPU": //CPU电压
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "VGPU1": //GPU电压
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "PCPUPKG": //CPU Package功耗
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    case "PGPU1TDPP": //GPU TDP
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                    /*  备用代码   */
-                    /*
-                    case "":
-                        id.Add(element.Element("id").Value);
-                        value.Add(element.Element("value").Value);
-                        break;
-                     */
+                    if ((bool)a.IsChecked)
+                    {
+                        hii.contStr = (string)a.Content;
+                        foreach (var b in ((StackPanel)a.Parent).Children.OfType<TextBox>())
+                        {
+                            if (b.Name.Equals(a.Content + "ProportionTextBox"))
+                            {
+                                hii.proportionStr = b.Text;
+                                break;
+                            }
+                        }
+                        foreach (var c in ((StackPanel)a.Parent).Children.OfType<ComboBox>())
+                        {
+                            if (c.Name.Equals(a.Content + "comboBox"))
+                            {
+                                hii.unitStr = c.Text;
+                                break;
+                            }
+                        }
+                        jobj.Add(new JProperty((string) a.Content,
+                            new JObject(
+                                new JProperty("checked", true),
+                                new JProperty("proportion", hii.proportionStr),
+                                new JProperty("unit",hii.unitStr)
+                                )));
+                    }
                 }
+            }
+            File.WriteAllText("config.json", jobj.ToString());
+        }
+
+        public void SerialCommand(string inputCommand)
+        {
+            if (inputCommand.Equals("ESP_ONLINE"))
+            {
+                LogOut("成功链接8266");
+            }
+        }
+
+        public string UnitConversion(string unitStr,string proportionStr, string value)
+        {
+            if (unitStr.Equals("Ghz"))
+            {
+                return Convert.ToDouble(value) / Convert.ToDouble(proportionStr) + " " + unitStr;
+            }
+            return Convert.ToDouble(value) / Convert.ToDouble(proportionStr) + " " + unitStr;
+        }
+        public JObject MakeHardInfo()
+        {
+            JObject infoJObject = new JObject();
+            List<HardInfoItem> hardInfoList = QuerySelectedInfo();
+            if (hardInfoList.Count == 0)
+            {
+                LogOut("请选择要发送的数据");
+                return null;
+            }
+            foreach (var aidaElement in aidaElements)
+            {
+                if (sendIndex >= hardInfoList.Count)
+                {
+                    sendIndex = 0;
+                }
+                if (hardInfoList[sendIndex].contStr.Equals(aidaElement.Element("id")?.Value))
+                {
+                    infoJObject = new JObject(new JProperty("l", hardInfoList[sendIndex].labelStr),
+                        new JProperty("v", UnitConversion(hardInfoList[sendIndex].unitStr, hardInfoList[sendIndex].proportionStr, aidaElement.Element("value")?.Value)));
+                }
+            }
+            return infoJObject;
+        }
+        //定时增加发送的Index
+        private void sendIndexTimer_Tick(object sender, EventArgs e)
+        {
+            sendIndex++;
+        }
+
+        private void SendInfoButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sp.IsOpen)
+            {
+                LogOut("请开启串口再发送");
+                return;
+            }
+            if (SendInfoButton.Content.ToString().Equals("发送"))
+            {
+                sendTaskTokenSource = new CancellationTokenSource();
+                sendTaskToken = sendTaskTokenSource.Token;
+                sendIndexTimer = new DispatcherTimer();
+                sendIndexTimer.Interval = TimeSpan.FromSeconds(10);
+                sendIndexTimer.Tick += sendIndexTimer_Tick;
+                sendIndexTimer.Start();
+                serialSendTask = new Task(() =>
+                {
+                    while (true)
+                    {
+                        if (sendTaskToken.IsCancellationRequested)
+                        {
+                            sendIndexTimer.Stop();
+                            return;
+                        }
+                        int delayTime = 500;
+                        GetAidaInfo();
+                        Dispatcher.Invoke(delegate
+                        {
+                            LogOut(MakeHardInfo().ToString());
+                        });
+                        Dispatcher.Invoke(delegate
+                        {
+                            delayTime = Convert.ToInt32(SendInfoDealyBox.Text);
+                        });
+                        delayTime = delayTime >= 100 && delayTime <= 500?delayTime:500;
+                        Task.Delay(delayTime);
+                        //TODO:串口发送JSON数据给下位机
+                    }
+                }, sendTaskToken);
+                serialSendTask.Start();
+                SendInfoButton.Content = "停止";
+            }
+            else
+            {
+                sendTaskTokenSource.Cancel();
+                GC.Collect();
+                SendInfoButton.Content = "发送";
             }
         }
     }

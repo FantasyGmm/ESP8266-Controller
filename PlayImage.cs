@@ -1,4 +1,4 @@
-﻿namespace ESP8266_Controller_WPF
+﻿namespace ESP8266_Controller
 {
     [PropertyChanged.AddINotifyPropertyChangedInterface]
     public class PlayImage

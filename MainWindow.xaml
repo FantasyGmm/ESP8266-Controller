@@ -1,21 +1,21 @@
-﻿<Window x:Class="ESP8266_Controller_WPF.MainWindow"
+﻿<Window x:Class="ESP8266_Controller.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:ESP8266_Controller_WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="600" Width="800" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen">
+        Title="MainWindow" Height="600" Width="800" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen" Closed="Window_Closed">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="319*"/>
-            <ColumnDefinition Width="474*"/>
+            <ColumnDefinition Width="469*"/>
+            <ColumnDefinition Width="6*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Grid Margin="0,5,-0.4,20.4" Grid.ColumnSpan="2" Grid.RowSpan="2">
+        <Grid Margin="0,5,-0.4,20.4" Grid.ColumnSpan="3" Grid.RowSpan="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Name="ControlPanel" Width="3*"/>
                 <ColumnDefinition Name="SettingPanel" Width="*"/>
@@ -32,7 +32,7 @@
                     <ComboBox Width="85" Margin="0,0,10,0" SelectedIndex="0"  Name="SerialPortComboBox">
                         <ComboBoxItem Content="选择串口"/>
                     </ComboBox>
-                    <ComboBox Width="85" Margin="0,0,10,0" IsEditable="True" SelectedIndex="12" Name="BaudRateComboBox">
+                    <ComboBox Width="85" Margin="0,0,10,0" IsEditable="True" SelectedIndex="24" Name="BaudRateComboBox">
                         <ComboBoxItem Content="110"/>
                         <ComboBoxItem Content="330"/>
                         <ComboBoxItem Content="600"/>
@@ -61,15 +61,28 @@
                         <ComboBoxItem Content="2000000"/>
                     </ComboBox>
                     <Button Content="刷新" Margin="0,0,10,0" Width="85" Name="FlushButton" Click="FlushButton_Click"/>
-                    <Button Content="连接" Width="85" Name="ConnectButton" Click="ConnectButton_Click"/>
+                    <Button Content="连接" Width="85" Name="ConnectButton" Click="ConnectButton_Click" Margin="0,1,0,-0.6"/>
                 </StackPanel>
                 <!--选项-->
                 <Grid Grid.Row="1" Margin="5,1,5,1">
                     <TabControl>
                         <TabItem Header="监视信息">
-                            <StackPanel>
-                                <CheckBox Content="CPU"/>
-                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.5*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <UniformGrid Columns="2" Margin="0,0,0,0">
+                                    <TextBlock Text="发送间隔"/>
+                                    <TextBox Name="SendInfoDealyBox" Text="500"/>
+                                    <Button Name="SendInfoButton" Content="发送" Click="SendInfoButton_Click" IsEnabled="False"></Button>
+                                    <Button></Button>
+                                </UniformGrid>
+                                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                                    <StackPanel  Name="HardInfoPanel">
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Grid>
                         </TabItem>
                         <TabItem Header="播放动画">
                             <Grid>
@@ -172,7 +185,7 @@
             </TabControl>
         </Grid>
         <!--底部信息显示-->
-        <StatusBar Grid.Row="1 " Grid.ColumnSpan="2" Margin="0,0.4,-0.4,0.4">
+        <StatusBar Grid.Row="1 " Grid.ColumnSpan="3" Grid.Column="0" Margin="0,0.2,-0.4,0.4">
             <StatusBarItem>
                 <TextBlock Text="状态：" TextAlignment="Center" VerticalAlignment="Center"/>
             </StatusBarItem>
