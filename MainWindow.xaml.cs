@@ -56,7 +56,7 @@ namespace ESP8266_Controller
                 SendInfoButton.IsEnabled = true;
             }
             LoadJsonConfig();
-            addSerialComboItem();
+            AddSerialComboItem();
             if (SerialPort.GetPortNames().Length == 1)
             {
                 LogOut("未检测到串口，请插入设备");
@@ -146,7 +146,7 @@ namespace ESP8266_Controller
                     DtrEnable = false
                 };
             }
-            addSerialComboItem();
+            AddSerialComboItem();
             if (AIDAQuery())
             {
                 GetAidaInfo();
@@ -328,7 +328,7 @@ namespace ESP8266_Controller
                 HardInfoPanel.Children.Add(sp);
             }
         }
-        private void addSerialComboItem()
+        private void AddSerialComboItem()
         {
             string[] ports;
             for (var i = 1; i < SerialPortComboBox.Items.Count; i++)
@@ -475,7 +475,7 @@ namespace ESP8266_Controller
             return infoJObject;
         }
         //定时增加发送的Index
-        private void sendIndexTimer_Tick(object sender, EventArgs e)
+        private void SendIndexTimer_Tick(object sender, EventArgs e)
         {
             sendIndex++;
         }
@@ -491,9 +491,11 @@ namespace ESP8266_Controller
             {
                 sendTaskTokenSource = new CancellationTokenSource();
                 sendTaskToken = sendTaskTokenSource.Token;
-                sendIndexTimer = new DispatcherTimer();
-                sendIndexTimer.Interval = TimeSpan.FromSeconds(10);
-                sendIndexTimer.Tick += sendIndexTimer_Tick;
+                sendIndexTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(10)
+                };
+                sendIndexTimer.Tick += SendIndexTimer_Tick;
                 sendIndexTimer.Start();
                 serialSendTask = new Task(() =>
                 {
