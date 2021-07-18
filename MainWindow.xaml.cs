@@ -1,5 +1,4 @@
-﻿using ESP8266_Controller;
-using Microsoft.WindowsAPICodePack.Dialogs;
+﻿using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -32,12 +31,14 @@ namespace ESP8266_Controller
         private SerialPort sp;
         private MemoryMappedViewAccessor Accessor;
         private IEnumerable<XElement> aidaElements;
-        private Task serialReadTask;
+        private Task serialReceiveTask;
+        private CancellationTokenSource receiveTaskTokenSource;
+        private CancellationToken receiveTaskToken;
         private Task serialSendTask;
         private CancellationTokenSource sendTaskTokenSource;
         private CancellationToken sendTaskToken;
         private DispatcherTimer sendIndexTimer;
-        private int sendIndex = 0;
+        private int sendIndex;
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             BackButton.DataContext = pi;
@@ -181,11 +182,16 @@ namespace ESP8266_Controller
                 SendInfoButton.IsEnabled = true;
                 ConnectButton.Content = "断开";
                 LogOut("串口连接成功");
-                serialReadTask = new Task(() =>
+                serialReceiveTask = new Task(() =>
                 {
-                    SerialCommand(sp.ReadLine());
+                    string cmd = sp.ReadLine();
+                    SerialCommand(cmd);
+                    Dispatcher.Invoke(delegate
+                    {
+                        LogOut(cmd);
+                    });
                 });
-                serialReadTask.Start();
+                serialReceiveTask.Start();
             }
             else
             {
@@ -487,6 +493,7 @@ namespace ESP8266_Controller
                 LogOut("请开启串口再发送");
                 return;
             }
+
             if (SendInfoButton.Content.ToString().Equals("发送"))
             {
                 sendTaskTokenSource = new CancellationTokenSource();
