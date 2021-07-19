@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Ports;
@@ -58,7 +59,7 @@ namespace ESP8266_Controller
             }
             LoadJsonConfig();
             AddSerialComboItem();
-            if (SerialPort.GetPortNames().Length >= 1)
+            if (SerialPort.GetPortNames().Length == 0)
             {
                 LogOut("未检测到串口，请插入设备");
             }
@@ -118,7 +119,7 @@ namespace ESP8266_Controller
         private void FlushButton_Click(object sender, RoutedEventArgs e)
         {
             LogBox.Text = "";
-            if (SerialPort.GetPortNames().Length == 1)
+            if (SerialPort.GetPortNames().Length == 0)
             {
                 LogOut("未检测到串口，请插入设备");
             }
@@ -153,7 +154,6 @@ namespace ESP8266_Controller
             }
             if (ConnectButton.Content.ToString().Equals("断开"))
             {
-                //TODO:先取消线程再关闭串口
                 sp.Close();
                 ConnectButton.Content = "连接";
                 FlushButton.IsEnabled = true;
@@ -187,13 +187,14 @@ namespace ESP8266_Controller
                     while (true)
                     {
                         //TODO:串口缺少循环读取，需要判断串口接受到了数据才开始输出
-                        string cmd = sp.ReadLine();
-                        SerialCommand(cmd);
-                        Dispatcher.Invoke(delegate
-                        {
-                            LogOut("已收到：");
-                            LogOut(cmd);
-                        });
+                        //string cmd = sp.ReadLine();
+                        //SerialCommand(cmd);
+                        //Dispatcher.Invoke(delegate
+                        //{
+                        //    LogOut("已收到：");
+                        //    LogOut(cmd);
+                        //});
+                        Task.Delay(100).Wait();
                     }
                 });
                 serialReceiveTask.Start();
@@ -228,6 +229,7 @@ namespace ESP8266_Controller
         }
         private void GetAidaInfo()
         {
+            Accessor = MemoryMappedFile.OpenExisting("AIDA64_SensorValues").CreateViewAccessor();
             StringBuilder tmp = new StringBuilder();
             MemoryStream ms = new MemoryStream();
             for (int i = 0; i < Accessor.Capacity; i++)
@@ -287,17 +289,18 @@ namespace ESP8266_Controller
         }
         private void AddCheckBox()
         {
+            HardInfoPanel.Children.RemoveRange(0,HardInfoPanel.Children.Count);
             foreach (var xElement in aidaElements)
             {
                 CheckBox cb = new CheckBox
                 {
                     Content = xElement.Element("id")?.Value,
-                    Width = HardInfoPanel.ActualWidth / 2.5
+                    Width = HardInfoPanel.ActualWidth / 2.8
                 };
                 TextBox tb = new TextBox
                 {
                     Text = xElement.Element("label")?.Value,
-                    Width = HardInfoPanel.ActualWidth / 4,
+                    Width = HardInfoPanel.ActualWidth / 3,
                     Margin = new Thickness(5,0,5,0),
                     Name = xElement.Element("id")?.Value + "textBox",
                 };
@@ -316,12 +319,15 @@ namespace ESP8266_Controller
                     Width = HardInfoPanel.ActualWidth / 8
                 };
                 cob.Items.Add("%");
-                cob.Items.Add("°C");
+                cob.Items.Add("C");
                 cob.Items.Add("Ghz");
                 cob.Items.Add("Mhz");
                 cob.Items.Add("GB");
+                cob.Items.Add("MB");
                 cob.Items.Add("MB/s");
                 cob.Items.Add("KB/s");
+                cob.Items.Add("V");
+                cob.Items.Add("W");
                 cob.Name = xElement.Element("id")?.Value + "comboBox";
                 StackPanel sp = new StackPanel
                 {
@@ -334,6 +340,7 @@ namespace ESP8266_Controller
                 sp.Children.Add(cob);
                 HardInfoPanel.Children.Add(sp);
             }
+            LoadJsonConfig();
         }
         private void AddSerialComboItem()
         {
@@ -377,10 +384,14 @@ namespace ESP8266_Controller
                     }
                     foreach (var b in ((StackPanel)child).Children.OfType<TextBox>())
                     {
+                        if (b.Name.Equals(jtoken.Key + "textBox"))
+                        {
+                            b.Text = infoJToken["label"].ToString();
+                            continue;
+                        }
                         if (b.Name.Equals(jtoken.Key + "ProportionTextBox"))
                         {
                             b.Text = infoJToken["proportion"].ToString();
-                            break;
                         }
                     }
                     foreach (var c in ((StackPanel)child).Children.OfType<ComboBox>())
@@ -411,32 +422,35 @@ namespace ESP8266_Controller
                 HardInfoItem hii = new HardInfoItem();
                 foreach (var a in ((StackPanel)child).Children.OfType<CheckBox>())
                 {
-                    if ((bool)a.IsChecked)
+                    hii.contStr = (string)a.Content;
+                    foreach (var b in ((StackPanel)a.Parent).Children.OfType<TextBox>())
                     {
-                        hii.contStr = (string)a.Content;
-                        foreach (var b in ((StackPanel)a.Parent).Children.OfType<TextBox>())
+                        if (b.Name.Equals(a.Content + "textBox"))
                         {
-                            if (b.Name.Equals(a.Content + "ProportionTextBox"))
-                            {
-                                hii.proportionStr = b.Text;
-                                break;
-                            }
+                            hii.labelStr = b.Text;
+                            continue;
                         }
-                        foreach (var c in ((StackPanel)a.Parent).Children.OfType<ComboBox>())
+                        if (b.Name.Equals(a.Content + "ProportionTextBox"))
                         {
-                            if (c.Name.Equals(a.Content + "comboBox"))
-                            {
-                                hii.unitStr = c.Text;
-                                break;
-                            }
+                            hii.proportionStr = b.Text;
+                            break;
                         }
-                        jobj.Add(new JProperty((string) a.Content,
-                            new JObject(
-                                new JProperty("checked", true),
-                                new JProperty("proportion", hii.proportionStr),
-                                new JProperty("unit",hii.unitStr)
-                                )));
                     }
+                    foreach (var c in ((StackPanel)a.Parent).Children.OfType<ComboBox>())
+                    {
+                        if (c.Name.Equals(a.Content + "comboBox"))
+                        {
+                            hii.unitStr = c.Text;
+                            break;
+                        }
+                    }
+                    jobj.Add(new JProperty((string)a.Content,
+                        new JObject(
+                            new JProperty("label", hii.labelStr),
+                            new JProperty("checked", (bool)a.IsChecked),
+                            new JProperty("proportion", hii.proportionStr),
+                            new JProperty("unit", hii.unitStr)
+                        )));
                 }
             }
             File.WriteAllText("config.json", jobj.ToString());
@@ -491,8 +505,7 @@ namespace ESP8266_Controller
         {
             if (!sp.IsOpen)
             {
-                LogOut("请开启串口再发送");
-                return;
+                ConnectButton_Click(ConnectButton,new RoutedEventArgs());
             }
             if (SendInfoButton.Content.ToString().Equals("发送"))
             {
@@ -508,6 +521,8 @@ namespace ESP8266_Controller
                 {
                     while (true)
                     {
+                        //Stopwatch sw = new Stopwatch();
+                        //sw.Start();
                         if (sendTaskToken.IsCancellationRequested)
                         {
                             sendIndexTimer.Stop();
@@ -520,7 +535,12 @@ namespace ESP8266_Controller
                             sp.WriteLine(MakeHardInfo().ToString());
                             delayTime = Convert.ToInt32(SendInfoDelayBox.Text);
                         });
-                        delayTime = delayTime >= 100 && delayTime <= 2000 ? delayTime : 2000;
+                        delayTime = delayTime >= 50 ? (delayTime <= 2000 ? delayTime : 2000) : 50;
+                        //Dispatcher.Invoke(delegate
+                        //{
+                        //    sw.Stop();
+                        //    LogOut(sw.ElapsedMilliseconds+"ms");
+                        //});
                         try
                         {
                             Task.Delay(delayTime,sendTaskToken).Wait();
@@ -530,12 +550,14 @@ namespace ESP8266_Controller
                 }, sendTaskToken);
                 serialSendTask.Start();
                 SendInfoButton.Content = "停止";
+                ConnectButton.IsEnabled = false;
             }
             else
             {
                 sendTaskTokenSource.Cancel();
                 GC.Collect();
                 SendInfoButton.Content = "发送";
+                ConnectButton.IsEnabled = true;
             }
         }
     }

@@ -73,14 +73,14 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <UniformGrid Columns="2" Margin="0,0,0,0">
-                                    <TextBlock Text="发送间隔"/>
-                                    <TextBox Name="SendInfoDelayBox" Text="500"/>
-                                    <TextBlock Text="轮播间隔"/>
-                                    <TextBox Name="ChangeNextDelayBox" Text="10"/>
+                                    <TextBlock Text="发送间隔" VerticalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBox Name="SendInfoDelayBox" Text="50"  VerticalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="轮播间隔"  VerticalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBox Name="ChangeNextDelayBox" Text="5"  VerticalAlignment="Center" TextAlignment="Center"/>
                                     <Button Name="SendInfoButton" Content="发送" Click="SendInfoButton_Click" IsEnabled="False"></Button>
-                                    <Button></Button>
+                                    <Button Content=""></Button>
                                 </UniformGrid>
-                                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                                     <StackPanel  Name="HardInfoPanel">
                                     </StackPanel>
                                 </ScrollViewer>

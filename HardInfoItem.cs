@@ -8,7 +8,7 @@
         public string proportionStr;
         public override string ToString()
         {
-            return contStr + " " + labelStr + " " + proportionStr + " " + unitStr;
+            return labelStr + " " + proportionStr + " " + unitStr;
         }
     }
 }
