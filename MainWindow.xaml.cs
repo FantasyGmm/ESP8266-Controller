@@ -58,23 +58,11 @@ namespace ESP8266_Controller
             }
             LoadJsonConfig();
             AddSerialComboItem();
-            if (SerialPort.GetPortNames().Length == 1)
+            if (SerialPort.GetPortNames().Length >= 1)
             {
                 LogOut("未检测到串口，请插入设备");
             }
-            else
-            {
-                sp = new SerialPort((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString(), Convert.ToInt32((BaudRateComboBox.SelectedItem as ComboBoxItem).Content.ToString()))
-                {
-                    DataBits = 8,
-                    Parity = Parity.None,
-                    StopBits = StopBits.One,
-                    Handshake = Handshake.None,
-                    ReceivedBytesThreshold = 13,
-                    RtsEnable = false,
-                    DtrEnable = false
-                };
-            }
+            sp = new SerialPort();
         }
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
@@ -165,6 +153,7 @@ namespace ESP8266_Controller
             }
             if (ConnectButton.Content.ToString().Equals("断开"))
             {
+                //TODO:先取消线程再关闭串口
                 sp.Close();
                 ConnectButton.Content = "连接";
                 FlushButton.IsEnabled = true;
@@ -172,6 +161,16 @@ namespace ESP8266_Controller
                 SerialPortComboBox.IsEnabled = true;
                 return;
             }
+            sp = new SerialPort((SerialPortComboBox.SelectedItem as ComboBoxItem).Content.ToString(), Convert.ToInt32((BaudRateComboBox.SelectedItem as ComboBoxItem).Content.ToString()))
+            {
+                DataBits = 8,
+                Parity = Parity.None,
+                StopBits = StopBits.One,
+                Handshake = Handshake.None,
+                ReceivedBytesThreshold = 13,
+                RtsEnable = false,
+                DtrEnable = false
+            };
             sp.Open();
             if (sp.IsOpen)
             {
@@ -179,6 +178,7 @@ namespace ESP8266_Controller
                 FlushButton.IsEnabled = false;
                 BaudRateComboBox.IsEnabled = false;
                 SerialPortComboBox.IsEnabled = false;
+                //TODO:判断AIDA64是否开启才启用按钮
                 SendInfoButton.IsEnabled = true;
                 ConnectButton.Content = "断开";
                 LogOut("串口连接成功");
@@ -188,6 +188,7 @@ namespace ESP8266_Controller
                     SerialCommand(cmd);
                     Dispatcher.Invoke(delegate
                     {
+                        LogOut("已收到：");
                         LogOut(cmd);
                     });
                 });
@@ -206,7 +207,7 @@ namespace ESP8266_Controller
         public void LogOut(string log)
         {
             LogBox.AppendText(log+Environment.NewLine);
-            //LogBox.ScrollToEnd();
+            LogBox.ScrollToEnd();
         }
         private bool AIDAQuery()
         {
@@ -240,10 +241,7 @@ namespace ESP8266_Controller
                 XDocument xmldoc = XDocument.Parse(tmp.ToString());
                 aidaElements = xmldoc.Element("AIDA").Elements();
             }
-            catch
-            {
-
-            }
+            catch { }
         }
 
         public List<HardInfoItem> QuerySelectedInfo()
@@ -262,19 +260,18 @@ namespace ESP8266_Controller
                             if (b.Name.Equals(a.Content + "textBox"))
                             {
                                 hii.labelStr = b.Text;
-                                break;
+                                continue;
                             }
                             if (b.Name.Equals(a.Content + "ProportionTextBox"))
-                            {
+                            { ;
                                 hii.proportionStr = b.Text;
-                                break;
                             }
                         }
                         foreach (var c in ((StackPanel)a.Parent).Children.OfType<ComboBox>())
                         {
                             if (c.Name.Equals(a.Content + "comboBox"))
                             {
-                                hii.unitStr = c.SelectedItem.ToString();
+                                hii.unitStr = c.Text;
                                 break;
                             }
                         }
@@ -453,7 +450,7 @@ namespace ESP8266_Controller
         {
             if (unitStr.Equals("Ghz"))
             {
-                return Convert.ToDouble(value) / Convert.ToDouble(proportionStr) + " " + unitStr;
+                return Convert.ToDouble(value) / 1000d + " " + unitStr;
             }
             return Convert.ToDouble(value) / Convert.ToDouble(proportionStr) + " " + unitStr;
         }
@@ -488,19 +485,18 @@ namespace ESP8266_Controller
 
         private void SendInfoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sp.IsOpen)
+            if (!sp.IsOpen)
             {
                 LogOut("请开启串口再发送");
                 return;
             }
-
             if (SendInfoButton.Content.ToString().Equals("发送"))
             {
                 sendTaskTokenSource = new CancellationTokenSource();
                 sendTaskToken = sendTaskTokenSource.Token;
                 sendIndexTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromSeconds(10)
+                    Interval = TimeSpan.FromSeconds(Convert.ToDouble(ChangeNextDelayBox.Text))
                 };
                 sendIndexTimer.Tick += SendIndexTimer_Tick;
                 sendIndexTimer.Start();
@@ -517,15 +513,15 @@ namespace ESP8266_Controller
                         GetAidaInfo();
                         Dispatcher.Invoke(delegate
                         {
-                            LogOut(MakeHardInfo().ToString());
+                            sp.WriteLine(MakeHardInfo().ToString());
+                            delayTime = Convert.ToInt32(SendInfoDelayBox.Text);
                         });
-                        Dispatcher.Invoke(delegate
+                        delayTime = delayTime >= 100 && delayTime <= 2000 ? delayTime : 2000;
+                        try
                         {
-                            delayTime = Convert.ToInt32(SendInfoDealyBox.Text);
-                        });
-                        delayTime = delayTime >= 100 && delayTime <= 500?delayTime:500;
-                        Task.Delay(delayTime);
-                        //TODO:串口发送JSON数据给下位机
+                            Task.Delay(delayTime,sendTaskToken).Wait();
+                        }
+                        catch { }
                     }
                 }, sendTaskToken);
                 serialSendTask.Start();

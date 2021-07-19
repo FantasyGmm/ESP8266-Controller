@@ -74,7 +74,9 @@
                                 </Grid.ColumnDefinitions>
                                 <UniformGrid Columns="2" Margin="0,0,0,0">
                                     <TextBlock Text="发送间隔"/>
-                                    <TextBox Name="SendInfoDealyBox" Text="500"/>
+                                    <TextBox Name="SendInfoDelayBox" Text="500"/>
+                                    <TextBlock Text="轮播间隔"/>
+                                    <TextBox Name="ChangeNextDelayBox" Text="10"/>
                                     <Button Name="SendInfoButton" Content="发送" Click="SendInfoButton_Click" IsEnabled="False"></Button>
                                     <Button></Button>
                                 </UniformGrid>
