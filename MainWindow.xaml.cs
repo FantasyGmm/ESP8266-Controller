@@ -184,13 +184,17 @@ namespace ESP8266_Controller
                 LogOut("串口连接成功");
                 serialReceiveTask = new Task(() =>
                 {
-                    string cmd = sp.ReadLine();
-                    SerialCommand(cmd);
-                    Dispatcher.Invoke(delegate
+                    while (true)
                     {
-                        LogOut("已收到：");
-                        LogOut(cmd);
-                    });
+                        //TODO:串口缺少循环读取，需要判断串口接受到了数据才开始输出
+                        string cmd = sp.ReadLine();
+                        SerialCommand(cmd);
+                        Dispatcher.Invoke(delegate
+                        {
+                            LogOut("已收到：");
+                            LogOut(cmd);
+                        });
+                    }
                 });
                 serialReceiveTask.Start();
             }
