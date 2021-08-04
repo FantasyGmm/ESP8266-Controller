@@ -2,7 +2,6 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Ports;
@@ -67,7 +66,51 @@ namespace ESP8266_Controller
         }
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            PlayButtonChange();
+            if (!sp.IsOpen)
+            {
+                ConnectButton_Click(ConnectButton, new RoutedEventArgs());
+            }
+            if (PlayButton.Content.Equals("播放"))
+            {
+                if (string.IsNullOrEmpty(PathTextBox.Text))
+                {
+                    LogOut("请选择图片路径");
+                    return;
+                }
+                PlayButton.Content = "暂停";
+                pi.IsPlaying = true;
+                pi.IsPuase = false;
+                sendTaskTokenSource = new CancellationTokenSource();
+                sendTaskToken = sendTaskTokenSource.Token;
+                serialSendTask = new Task(() =>
+                {
+                    sp.WriteLine(new JObject(new JProperty("m", "2")).ToString());
+                    while (true)
+                    {
+                        int delayTime = 500;
+                        GetAidaInfo();
+                        Dispatcher.Invoke(delegate
+                        {
+                            sp.WriteLine(MakeHardInfo().ToString());
+                            delayTime = Convert.ToInt32(SendInfoDelayBox.Text);
+                        });
+                        delayTime = delayTime >= 50 ? (delayTime <= 2000 ? delayTime : 2000) : 50;
+                        try
+                        {
+                            Task.Delay(delayTime, sendTaskToken).Wait();
+                        }
+                        catch { }
+                    }
+                }, sendTaskToken);
+                serialSendTask.Start();
+                ConnectButton.IsEnabled = false;
+            }
+            else
+            {
+                PlayButton.Content = "播放";
+                pi.IsPuase = true;
+                ConnectButton.IsEnabled = true;
+            }
         }
 
         private void LimitInputNumber(object sender, TextCompositionEventArgs e)
@@ -83,25 +126,6 @@ namespace ESP8266_Controller
             PlayButton.Content = "播放";
         }
 
-        private void PlayButtonChange()
-        {
-            if (PlayButton.Content.Equals("播放"))
-            {
-                if (string.IsNullOrEmpty(PathTextBox.Text))
-                {
-                    LogOut("请选择图片路径");
-                    return;
-                }
-                PlayButton.Content = "暂停";
-                pi.IsPlaying = true;
-                pi.IsPuase = false;
-            }
-            else
-            {
-                PlayButton.Content = "播放";
-                pi.IsPuase = true;
-            }
-        }
 
         private void PathButton_Click(object sender, RoutedEventArgs e)
         {
@@ -187,13 +211,13 @@ namespace ESP8266_Controller
                     while (true)
                     {
                         //TODO:串口缺少循环读取，需要判断串口接受到了数据才开始输出
-                        //string cmd = sp.ReadLine();
-                        //SerialCommand(cmd);
-                        //Dispatcher.Invoke(delegate
-                        //{
-                        //    LogOut("已收到：");
-                        //    LogOut(cmd);
-                        //});
+                        string cmd = sp.ReadTo("!");
+                        SerialCommand(cmd);
+                        Dispatcher.Invoke(delegate
+                        {
+                            LogOut("已收到：");
+                            LogOut(cmd);
+                        });
                         Task.Delay(100).Wait();
                     }
                 });
@@ -489,7 +513,8 @@ namespace ESP8266_Controller
                 }
                 if (hardInfoList[sendIndex].contStr.Equals(aidaElement.Element("id")?.Value))
                 {
-                    infoJObject = new JObject(new JProperty("l", hardInfoList[sendIndex].labelStr),
+                    infoJObject = new JObject(new JProperty("m","1"),
+                        new JProperty("l", hardInfoList[sendIndex].labelStr),
                         new JProperty("v", UnitConversion(hardInfoList[sendIndex].unitStr, hardInfoList[sendIndex].proportionStr, aidaElement.Element("value")?.Value)));
                 }
             }
@@ -519,10 +544,9 @@ namespace ESP8266_Controller
                 sendIndexTimer.Start();
                 serialSendTask = new Task(() =>
                 {
+                    sp.WriteLine(new JObject(new JProperty("m","1")).ToString());
                     while (true)
                     {
-                        //Stopwatch sw = new Stopwatch();
-                        //sw.Start();
                         if (sendTaskToken.IsCancellationRequested)
                         {
                             sendIndexTimer.Stop();
@@ -536,11 +560,6 @@ namespace ESP8266_Controller
                             delayTime = Convert.ToInt32(SendInfoDelayBox.Text);
                         });
                         delayTime = delayTime >= 50 ? (delayTime <= 2000 ? delayTime : 2000) : 50;
-                        //Dispatcher.Invoke(delegate
-                        //{
-                        //    sw.Stop();
-                        //    LogOut(sw.ElapsedMilliseconds+"ms");
-                        //});
                         try
                         {
                             Task.Delay(delayTime,sendTaskToken).Wait();

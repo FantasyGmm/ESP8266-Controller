@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MainWindow" Height="600" Width="800" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen" Closed="Window_Closed">
+        Title="ESP_Controller" Height="600" Width="800" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen" Closed="Window_Closed">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="319*"/>
@@ -33,11 +33,6 @@
                         <ComboBoxItem Content="选择串口"/>
                     </ComboBox>
                     <ComboBox Width="85" Margin="0,0,10,0" IsEditable="True" SelectedIndex="24" Name="BaudRateComboBox">
-                        <ComboBoxItem Content="110"/>
-                        <ComboBoxItem Content="330"/>
-                        <ComboBoxItem Content="600"/>
-                        <ComboBoxItem Content="1200"/>
-                        <ComboBoxItem Content="2400"/>
                         <ComboBoxItem Content="4800"/>
                         <ComboBoxItem Content="9600"/>
                         <ComboBoxItem Content="14400"/>
@@ -77,8 +72,7 @@
                                     <TextBox Name="SendInfoDelayBox" Text="50"  VerticalAlignment="Center" TextAlignment="Center"/>
                                     <TextBlock Text="轮播间隔"  VerticalAlignment="Center" TextAlignment="Center"/>
                                     <TextBox Name="ChangeNextDelayBox" Text="5"  VerticalAlignment="Center" TextAlignment="Center"/>
-                                    <Button Name="SendInfoButton" Content="发送" Click="SendInfoButton_Click" IsEnabled="False"></Button>
-                                    <Button Content=""></Button>
+                                    <Button Name="SendInfoButton" Content="发送" Click="SendInfoButton_Click" IsEnabled="False"/>
                                 </UniformGrid>
                                 <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                                     <StackPanel  Name="HardInfoPanel">
@@ -86,7 +80,7 @@
                                 </ScrollViewer>
                             </Grid>
                         </TabItem>
-                        <TabItem Header="播放动画">
+                        <TabItem Header="控制中心">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="3.5*"/>
@@ -175,10 +169,10 @@
             </Grid>
             <!--右面板-->
             <TabControl Grid.Column="1" Margin="0,-2,0,2">
-                <TabItem Header="更新">
+                <TabItem Header="设置">
 
                 </TabItem>
-                <TabItem Header="设置">
+                <TabItem Header="更新">
 
                 </TabItem>
                 <TabItem Header="关于与反馈">
