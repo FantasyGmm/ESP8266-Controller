@@ -2,7 +2,6 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Ports;
@@ -184,18 +183,18 @@ namespace ESP8266_Controller
                 LogOut("串口连接成功");
                 serialReceiveTask = new Task(() =>
                 {
-                    while (true)
-                    {
-                        //TODO:串口缺少循环读取，需要判断串口接受到了数据才开始输出
-                        //string cmd = sp.ReadLine();
-                        //SerialCommand(cmd);
-                        //Dispatcher.Invoke(delegate
-                        //{
-                        //    LogOut("已收到：");
-                        //    LogOut(cmd);
-                        //});
-                        Task.Delay(100).Wait();
-                    }
+                    //while (true)
+                    //{
+                    //    //TODO:串口缺少循环读取，需要判断串口接受到了数据才开始输出
+                    //    string cmd = sp.ReadLine();
+                    //    SerialCommand(cmd);
+                    //    Dispatcher.Invoke(delegate
+                    //    {
+                    //        LogOut("已收到：");
+                    //        LogOut(cmd);
+                    //    });
+                    //    Task.Delay(100).Wait();
+                    //}
                 });
                 serialReceiveTask.Start();
             }
@@ -519,10 +518,13 @@ namespace ESP8266_Controller
                 sendIndexTimer.Start();
                 serialSendTask = new Task(() =>
                 {
+                    sp.WriteLine(new JObject(new JProperty("m","1")).ToString());
+                    Dispatcher.Invoke(delegate
+                    {
+                        LogOut(new JObject(new JProperty("m", "1")).ToString());
+                    });
                     while (true)
                     {
-                        //Stopwatch sw = new Stopwatch();
-                        //sw.Start();
                         if (sendTaskToken.IsCancellationRequested)
                         {
                             sendIndexTimer.Stop();
@@ -536,11 +538,6 @@ namespace ESP8266_Controller
                             delayTime = Convert.ToInt32(SendInfoDelayBox.Text);
                         });
                         delayTime = delayTime >= 50 ? (delayTime <= 2000 ? delayTime : 2000) : 50;
-                        //Dispatcher.Invoke(delegate
-                        //{
-                        //    sw.Stop();
-                        //    LogOut(sw.ElapsedMilliseconds+"ms");
-                        //});
                         try
                         {
                             Task.Delay(delayTime,sendTaskToken).Wait();
